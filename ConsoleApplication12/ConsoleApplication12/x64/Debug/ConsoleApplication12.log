@@ -1,0 +1,7 @@
+﻿  ConsoleApplication12.cpp
+C:\Users\IVAN\source\repos\ConsoleApplication12\ConsoleApplication12\ConsoleApplication12.cpp(386,66): warning C4267: аргумент: преобразование из "size_t" в "const _Ty"; возможна потеря данных
+C:\Users\IVAN\source\repos\ConsoleApplication12\ConsoleApplication12\ConsoleApplication12.cpp(386,66): warning C4267:         with
+C:\Users\IVAN\source\repos\ConsoleApplication12\ConsoleApplication12\ConsoleApplication12.cpp(386,66): warning C4267:         [
+C:\Users\IVAN\source\repos\ConsoleApplication12\ConsoleApplication12\ConsoleApplication12.cpp(386,66): warning C4267:             _Ty=int
+C:\Users\IVAN\source\repos\ConsoleApplication12\ConsoleApplication12\ConsoleApplication12.cpp(386,66): warning C4267:         ]
+  ConsoleApplication12.vcxproj -> C:\Users\IVAN\source\repos\ConsoleApplication12\x64\Debug\ConsoleApplication12.exe
