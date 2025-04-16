@@ -56,18 +56,18 @@ public:
     string name() const override { return "Солдат"; }
 };
 
-class Gatherer : public Role {
-public:
-    void Work(Formicidae& ant) override {
-        cout << "Собиратель собирает еду\n";
-    }
-    string name() const override { return "Собиратель"; }
-};
+//class Gatherer : public Role {
+//public:
+//    void Work(Formicidae& ant) override {
+//        cout << "Собиратель собирает еду\n";
+//    }
+//    string name() const override { return "Собиратель"; }
+//};
 
 class Builder : public Role {
 public:
     void Work(Formicidae& ant) override {
-        cout << "Строитель расширяет муравейник\n";
+        cout << "Строитель расширяет муравейник и собирает палочки\n";
     }
     string name() const override { return "Строитель"; }
 };
@@ -95,18 +95,18 @@ public:
         age++;
         if (age >= 4 && !grownUp) {
             grownUp = true;
-            // При взрослении назначаем роль солдата или сборщика по 50%
+            // При взрослении назначаем роль солдата или Builder по 50%
             double r = dis(gen);
             if (r < 0.5) {
                 role = make_shared<Soldier>();
                 currentRoleType = RoleType::Soldier;
             }
             else {
-                role = make_shared<Gatherer>();
-                currentRoleType = RoleType::Gatherer;
+                role = make_shared<Builder>();
+                currentRoleType = RoleType::Builder;
             }
         }
-        if (age >= 17) {
+        if (age >= 19) {
             alive = false; // убираем муравья из муравейника
             return; // досрочно выходим из метода
         }
@@ -119,7 +119,10 @@ public:
         if (age < 4) {
             role = make_shared<Nanny>(); currentRoleType = RoleType::Nanny;
         }
-        else if (age > 12) {
+        else if (age < 15 && age >= 10) {
+            role = make_shared<Builder>(); currentRoleType = RoleType::Builder;
+        }
+        else if (age > 15) {
             role = make_shared<Shepherd>(); currentRoleType = RoleType::Shepherd;
         }
     }
@@ -159,15 +162,24 @@ public:
     int food = 50;
     int maxFood = MAX_STOREROOM;
     int maxAnts = 50;
+    int branches = 0;
+    int maxBranches = 300; // произвольный максимум веточек
+
 
     vector<shared_ptr<Formicidae>> ants;
     vector<Observer*> observers;
 
     void addAnt(shared_ptr<Formicidae> ant) {
-        if (ants.size() < maxAnts && size >= static_cast<int>(ants.size()) + 1 && food >= 10) {
-            addFood(-10);
+        if (ants.size() < maxAnts && size >= static_cast<int>(ants.size()) + 1 && food >= 5) {
+            addFood(-5);
             ants.push_back(ant);
         }
+    }
+
+    void addBranches(int amount) {
+        branches += amount;
+        if (branches > maxBranches) branches = maxBranches;
+        if (branches < 0) branches = 0;
     }
 
 
@@ -176,6 +188,14 @@ public:
             if (ant->alive) {
                 if (ant->currentRoleType == RoleType::Shepherd) {
                     addFood(3);
+                }
+                if (ant->currentRoleType == RoleType::Builder) {
+                    addBranches(1); // сбор одного веточки
+                }
+                if (branches >= 3) {
+                    size += 1; // увеличение муравейника
+                    if (size > maxSize) size = maxSize;
+                    branches -= 3; // расход веточек
                 }
                 ant->work();
                 ant->ageUp();
@@ -277,16 +297,17 @@ int main() {
     for (int day = 0; day < 25; ++day) {
         cout << "День " << (day) << "\n";
 
-        /*if (day == 9) {
+        if (day == 9) {
             Enemy enemy;
             enemy.attack(hill);
-        }*/
+        }
 
         hill.simulateDay();
 
         cout << "Статистика:\n";
         cout << "Размер муравейника: " << hill.size << "\n";
         cout << "Количество муравьев: " << hill.ants.size() << "\n";
+        cout << "Веточки: " << hill.branches << "\n";
         cout << "Количество еды: " << hill.food << "\n";
 
         int countNanny = 0, countSoldier = 0, countGatherer = 0, countBuilder = 0, countShepherd = 0;
@@ -304,7 +325,6 @@ int main() {
         cout << "Роли:\n";
         cout << "\tНяни: " << countNanny << "\n";
         cout << "\tСолдаты: " << countSoldier << "\n";
-        cout << "\tСобиратели: " << countGatherer << "\n";
         cout << "\tСтроители: " << countBuilder << "\n";
         cout << "\tПастухи: " << countShepherd << "\n";
 
