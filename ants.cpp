@@ -3,317 +3,299 @@
 #include <string>
 #include <memory>
 #include <algorithm>
-#include <ctime>
 #include <random>
 
-using namespace std;
+using namespace std; // добавляем для устранения необходимости писать std::
 
-// Перечисление социальных ролей муравьев
-enum class SocialRole {
-    NONE,       // Нет роли (молодые муравьи)
-    NURSE,      // Нянька
-    SOLDIER,    // Солдат
-    SHEPHERD,   // Пастух (при плохом здоровье)
-    GATHERER,   // Собиратель
-    BUILDER,    // Строитель
-    CLEANER     // Уборщик
+random_device rd;
+mt19937 gen(rd());
+uniform_real_distribution<> dis(0, 1);
+
+// Объявление предварительных классов
+class Formicidae;
+class Role;
+class WorkObserver;
+class AntHill;
+class Enemy;
+
+// Статические константы
+const int MAX_AGE = 10;
+const int MAX_ROLES = 4;
+const int MAX_SOLDIER_ENEMY = 3;
+const int MAX_STOREROOM = 100;
+const int MAX_ANTHILL_SIZE = 50;
+
+// Перечисление ролей
+enum class RoleType { None, Nanny, Soldier, Gatherer, Builder, Shepherd
 };
 
-// Класс для оповещений
-class Informer;
-
-// Абстрактный класс Роль
+// ----------------------
+// АБСТРАКТНЫЙ КЛАСС РОЛЬ
 class Role {
 public:
-    virtual ~Role() = default;
-    virtual void work() = 0;
-    virtual SocialRole getRoleType() const = 0;
-    virtual void handleNotification(const string& message) = 0;
+    virtual ~Role() {}
+    virtual void Work(Formicidae& ant) = 0;
+    virtual string name() const = 0;
 };
 
-// Класс Муравей
-class Ant {
-private:
-    int age;
-    int health;
-    SocialRole currentRole;
-    unique_ptr<Role> role;
-    shared_ptr<Informer> informer;
-
+// ----------------------
+// Конкретные роли
+class Nanny : public Role {
 public:
-    Ant(int initialAge = 0, int initialHealth = 100)
-        : age(initialAge), health(initialHealth), currentRole(SocialRole::NONE) {}
+    void Work(Formicidae& ant) override {
+        cout << "Няня заботится о муравьях\n";
+    }
+    string name() const override { return "Няня"; }
+};
 
-    void update() {
+class Soldier : public Role {
+public:
+    void Work(Formicidae& ant) override {
+        cout << "Солдат защищает муравейник\n";
+    }
+    string name() const override { return "Солдат"; }
+};
+
+class Gatherer : public Role {
+public:
+    void Work(Formicidae& ant) override {
+        cout << "Собиратель собирает еду\n";
+    }
+    string name() const override { return "Собиратель"; }
+};
+
+class Builder : public Role {
+public:
+    void Work(Formicidae& ant) override {
+        cout << "Строитель расширяет муравейник\n";
+    }
+    string name() const override { return "Строитель"; }
+};
+
+class Shepherd : public Role {
+public:
+    void Work(Formicidae& ant) override {
+        cout << "Пастух собирает еду\n";
+    }
+    string name() const override { return "Пастух"; }
+};
+
+// ----------------------
+// МУРАВЕЙ
+class Formicidae {
+public:
+    int age = 0;
+    int health = 100;
+    RoleType currentRoleType = RoleType::None;
+    shared_ptr<Role> role;
+    bool alive = true;
+    bool grownUp = false; // добавляем флаг
+
+    void ageUp() {
         age++;
-        updateRole();
-        if (role) {
-            role->work();
+        if (age >= 8 && !grownUp) {
+            grownUp = true;
+            // При взрослении назначаем роль солдата или сборщика по 50%
+            double r = dis(gen);
+            if (r < 0.5) {
+                role = make_shared<Soldier>();
+                currentRoleType = RoleType::Soldier;
+            }
+            else {
+                role = make_shared<Gatherer>();
+                currentRoleType = RoleType::Gatherer;
+            }
         }
-        // Постепенное уменьшение здоровья с возрастом
-        if (age > 30) {
-            health -= 1;
+        else {
+            updateRole();
         }
     }
 
     void updateRole() {
-        SocialRole newRole = determineRole();
-        if (newRole != currentRole) {
-            currentRole = newRole;
-            assignRole();
+        if (age < 2) {
+            role = nullptr; currentRoleType = RoleType::None;
+        }
+        else if (age < 4) {
+            role = make_shared<Nanny>(); currentRoleType = RoleType::Nanny;
+        }
+        else if (age > 12) {
+            role = make_shared<Shepherd>(); currentRoleType = RoleType::Shepherd;
         }
     }
 
-    SocialRole determineRole() const {
-        if (age < 3) return SocialRole::NONE;
-        if (age < 7) return SocialRole::NURSE;
-        if (age < 15) {
-            return health > 70 ? SocialRole::SOLDIER : SocialRole::SHEPHERD;
-        }
-        if (age < 30) {
-            return health > 50 ? SocialRole::GATHERER : SocialRole::BUILDER;
-        }
-        return SocialRole::CLEANER;
+    void work() {
+        if (role && alive) role->Work(*this);
     }
 
-    void assignRole() {
-        // Здесь должна быть реализация создания конкретной роли
-        // В зависимости от currentRole
-        // Например:
-        // role = make_unique<NurseRole>(this);
-    }
-
-    void setHealth(int newHealth) { health = newHealth; }
-    int getHealth() const { return health; }
-    int getAge() const { return age; }
-    SocialRole getCurrentRole() const { return currentRole; }
-
-    void notify(const string& message) {
-        if (role) {
-            role->handleNotification(message);
+    void receiveDamage(int damage) {
+        health -= damage;
+        if (health <= 0) {
+            alive = false;
         }
     }
 };
 
-// Конкретные роли (примеры)
-class NurseRole : public Role {
-private:
-    Ant* ant;
+
+// ---------------------
+// ИНТЕРФЕЙС ОПОВЕЩЕНИЙ
+class INotifier {
 public:
-    NurseRole(Ant* a) : ant(a) {}
-    void work() override {
-        cout << "Нянька ухаживает за личинками" << endl;
-        ant->setHealth(ant->getHealth() - 1); // Работа утомляет
-    }
-    SocialRole getRoleType() const override { return SocialRole::NURSE; }
-    void handleNotification(const string& message) override {
-        if (message == "attack") {
-            cout << "Нянька спасает личинок!" << endl;
+    virtual ~INotifier() {}
+    virtual void notify(const string& message) = 0;
+};
+
+class Observer {
+public:
+    virtual void update(const string& event) = 0;
+};
+
+// ----------------------
+// Класс "Муравейник"
+class AntHill : public INotifier {
+public:
+    int size = 10;
+    int maxSize = MAX_ANTHILL_SIZE;
+    int food = 50;
+    int maxFood = MAX_STOREROOM;
+    int maxAnts = 20;
+
+    vector<shared_ptr<Formicidae>> ants;
+    vector<Observer*> observers;
+
+    void addAnt(shared_ptr<Formicidae> ant) {
+        if (ants.size() < maxAnts && size >= static_cast<int>(ants.size())) {
+            ants.push_back(ant);
         }
     }
-};
 
-class SoldierRole : public Role {
-private:
-    Ant* ant;
-public:
-    SoldierRole(Ant* a) : ant(a) {}
-    void work() override {
-        cout << "Солдат патрулирует территорию" << endl;
-        ant->setHealth(ant->getHealth() - 2); // Тяжелая работа
-    }
-    SocialRole getRoleType() const override { return SocialRole::SOLDIER; }
-    void handleNotification(const string& message) override {
-        if (message == "attack") {
-            cout << "Солдат бежит на защиту!" << endl;
-        }
-    }
-};
-
-// Класс для оповещений
-class Informer {
-private:
-    vector<Ant*> subscribers;
-public:
-    void subscribe(Ant* ant) {
-        subscribers.push_back(ant);
-    }
-    void unsubscribe(Ant* ant) {
-        subscribers.erase(remove(subscribers.begin(), subscribers.end(), ant), subscribers.end());
-    }
-    void notifyAll(const string& message) {
-        for (auto& sub : subscribers) {
-            sub->notify(message);
-        }
-    }
-};
-
-// Класс Враг
-class Enemy {
-private:
-    int strength;
-public:
-    Enemy(int str) : strength(str) {}
-    bool attack() {
-        return (rand() % 100) < strength; // Шанс успешной атаки
-    }
-    void setStrength(int str) { strength = str; }
-    int getStrength() const { return strength; }
-};
-
-// Класс Муравейник
-class AntHill {
-private:
-    int size;
-    int maxAnts;
-    int currentAnts;
-    int foodStorage;
-    int buildingMaterials;
-    vector<Ant> ants;
-    vector<shared_ptr<Informer>> informers;
-    vector<Enemy> enemies;
-
-public:
-    AntHill(int initialSize = 10)
-        : size(initialSize), maxAnts(initialSize * 10), currentAnts(0),
-        foodStorage(0), buildingMaterials(0) {
-        initializeInformers();
-    }
-
-    void initializeInformers() {
-        // Создаем информеры для разных типов событий
-        informers.resize(7); // По количеству ролей + общие
-    }
-
-    void update() {
-        // Обновляем всех муравьев
+    void simulateDay() {
         for (auto& ant : ants) {
-            ant.update();
-        }
-
-        // Проверяем условия для изменения муравейника
-        if (buildingMaterials > size * 5) {
-            expandHill();
-        }
-        else if (buildingMaterials == 0) {
-            decayHill();
-        }
-
-        // Проверяем запасы еды
-        if (foodStorage == 0) {
-            starveAnts();
-        }
-        else if (foodStorage > maxAnts * 2) {
-            // Избыток еды - можно размножаться
-            reproduceAnts();
-        }
-
-        // Проверяем нападения врагов
-        handleEnemyAttacks();
-    }
-
-    void expandHill() {
-        size++;
-        maxAnts = size * 10;
-        buildingMaterials -= size * 5;
-        cout << "Муравейник расширился! Новый размер: " << size << endl;
-    }
-
-    void decayHill() {
-        size = max(1, size - 1);
-        maxAnts = size * 10;
-        cout << "Муравейник уменьшился! Новый размер: " << size << endl;
-    }
-
-    void starveAnts() {
-        for (auto& ant : ants) {
-            ant.setHealth(ant.getHealth() - 5);
-        }
-        // Удаляем мертвых муравьев
-        ants.erase(remove_if(ants.begin(), ants.end(),
-            [](const Ant& a) { return a.getHealth() <= 0; }), ants.end());
-    }
-
-    void reproduceAnts() {
-        if (ants.size() >= maxAnts) return;
-
-        int newAnts = min(5, maxAnts - static_cast<int>(ants.size()));
-        for (int i = 0; i < newAnts; ++i) {
-            ants.emplace_back(0, 100);
-        }
-        foodStorage -= newAnts * 2;
-    }
-
-    void handleEnemyAttacks() {
-        if (enemies.empty() && (rand() % 100) < 5) {
-            // С шансом 5% появляется новый враг
-            enemies.emplace_back(rand() % 30 + 20);
-        }
-
-        for (auto& enemy : enemies) {
-            if (enemy.attack()) {
-                cout << "Враг атакует!" << endl;
-                informers[static_cast<int>(SocialRole::SOLDIER)]->notifyAll("attack");
-
-                // Простая логика боя
-                int soldierCount = count_if(ants.begin(), ants.end(),
-                    [](const Ant& a) { return a.getCurrentRole() == SocialRole::SOLDIER; });
-
-                if (soldierCount > 0 && (rand() % 100) < (soldierCount * 5)) {
-                    cout << "Солдаты победили врага!" << endl;
-                    enemies.erase(remove(enemies.begin(), enemies.end(), enemy), enemies.end());
-                }
-                else {
-                    cout << "Враг нанес урон!" << endl;
-                    // Враг убивает случайного муравья
-                    if (!ants.empty()) {
-                        ants.erase(ants.begin() + rand() % ants.size());
-                    }
-                }
+            if (ant->alive) {
+                ant->work();
+                ant->ageUp();
             }
+        }
+        ants.erase(remove_if(ants.begin(), ants.end(),
+            [](const shared_ptr<Formicidae>& a) { return !a->alive; }),
+            ants.end());
+
+        // Обновление размера муравейника при достаточном уровне еды
+        if (food > maxFood * 0.5 && size < maxSize) {
+            size += 1;
+            maxAnts = size;
+        }
+
+        // Регулировка еды
+        if (food < maxFood) {
+            food += rand() % 5;
+            if (food > maxFood) food = maxFood;
+        }
+        else if (food > 0) {
+            food -= rand() % 3;
+            if (food < 0) food = 0;
         }
     }
 
     void addFood(int amount) {
-        if (foodStorage + amount <= maxAnts * 3) {
-            foodStorage += amount;
-        }
+        if (food + amount <= maxFood)
+            food += amount;
+        else
+            food = maxFood;
     }
 
-    void addBuildingMaterials(int amount) {
-        buildingMaterials += amount;
+    void notify(const string& message) override {
+        for (auto* obs : observers)
+            obs->update(message);
     }
 
-    int getSize() const { return size; }
-    int getAntCount() const { return static_cast<int>(ants.size()); }
-    int getFoodStorage() const { return foodStorage; }
+    void addObserver(Observer* obs) { observers.push_back(obs); }
+    void removeObserver(Observer* obs) {
+        observers.erase(remove(observers.begin(), observers.end(), obs), observers.end());
+    }
 };
 
+// ----------------------
+// Враг
+class Enemy {
+public:
+    int strength = 50;
+
+    void attack(AntHill& hill) {
+        int countToKill = min<int>((int)hill.ants.size(), rand() % 3 + 1);
+        hill.ants.erase(hill.ants.begin(), hill.ants.begin() + countToKill);
+        hill.food -= rand() % 10;
+        if (hill.food < 0) hill.food = 0;
+        hill.notify("Враг напал на муравейник!");
+    }
+};
+
+// ----------------------
+// Класс "Информер" для оповещений
+class EventManager : public Observer {
+public:
+    string name;
+    EventManager(const string& n) : name(n) {}
+    void update(const string& event) override {
+        cout << "[" << name << "] Оповещение: " << event << "\n";
+    }
+};
+
+// --------------------------
+// Основная функция
 int main() {
-    srand(static_cast<unsigned>(time(nullptr)));
+    setlocale(LC_ALL, "Russian");
+    AntHill hill;
 
-    AntHill hill(5);
+    // Создаем подписчиков
+    EventManager em1("Информёр 1");
+    EventManager em2("Информёр 2");
+    hill.addObserver(&em1);
+    hill.addObserver(&em2);
 
-    // Добавляем начальных муравьев
-    for (int i = 0; i < 20; ++i) {
-        hill.addFood(10);
-        hill.addBuildingMaterials(5);
+    for (int i = 0; i < 20; i++) {
+        auto ant = make_shared<Formicidae>();
+        // сразу задаем роль няньки
+        ant->role = make_shared<Nanny>();
+        ant->currentRoleType = RoleType::Nanny;
+        hill.addAnt(ant);
     }
 
-    // Симуляция жизни муравейника
-    for (int day = 1; day <= 30; ++day) {
-        cout << "\n=== День " << day << " ===" << endl;
-        cout << "Размер муравейника: " << hill.getSize() << endl;
-        cout << "Количество муравьев: " << hill.getAntCount() << endl;
-        cout << "Запасы еды: " << hill.getFoodStorage() << endl;
 
-        hill.update();
+    for (int day = 0; day < 20; ++day) {
+        cout << "День " << (day) << "\n";
 
-        // Собиратели и строители приносят ресурсы
-        if (day % 3 == 0) {
-            hill.addFood(rand() % 10 + 5);
-            hill.addBuildingMaterials(rand() % 5 + 2);
+        if (day == 9) {
+            Enemy enemy;
+            enemy.attack(hill);
         }
+
+        hill.simulateDay();
+
+        cout << "Статистика:\n";
+        cout << "Размер муравейника: " << hill.size << "\n";
+        cout << "Количество муравьев: " << hill.ants.size() << "\n";
+        cout << "Количество еды: " << hill.food << "\n";
+
+        int countNanny = 0, countSoldier = 0, countGatherer = 0, countBuilder = 0, countShepherd = 0;
+        for (auto& ant : hill.ants) {
+            switch (ant->currentRoleType) {
+            case RoleType::Nanny: countNanny++; break;
+            case RoleType::Soldier: countSoldier++; break;
+            case RoleType::Gatherer: countGatherer++; break;
+            case RoleType::Builder: countBuilder++; break;
+            case RoleType::Shepherd: countShepherd++; break;
+            default: break;
+            }
+        }
+
+        cout << "Роли:\n";
+        cout << "\tНяни: " << countNanny << "\n";
+        cout << "\tСолдаты: " << countSoldier << "\n";
+        cout << "\tСобиратели: " << countGatherer << "\n";
+        cout << "\tСтроители: " << countBuilder << "\n";
+        cout << "\tПастухи: " << countShepherd << "\n";
+
+        cout << "------------------------\n";
     }
 
     return 0;
