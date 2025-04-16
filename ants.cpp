@@ -174,6 +174,9 @@ public:
     void simulateDay() {
         for (auto& ant : ants) {
             if (ant->alive) {
+                if (ant->currentRoleType == RoleType::Shepherd) {
+                    addFood(3);
+                }
                 ant->work();
                 ant->ageUp();
             }
@@ -271,7 +274,7 @@ int main() {
     }
 
 
-    for (int day = 0; day < 20; ++day) {
+    for (int day = 0; day < 25; ++day) {
         cout << "Δενό " << (day) << "\n";
 
         /*if (day == 9) {
