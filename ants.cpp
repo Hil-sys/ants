@@ -93,7 +93,7 @@ public:
 
     void ageUp() {
         age++;
-        if (age >= 8 && !grownUp) {
+        if (age >= 4 && !grownUp) {
             grownUp = true;
             // При взрослении назначаем роль солдата или сборщика по 50%
             double r = dis(gen);
@@ -106,16 +106,17 @@ public:
                 currentRoleType = RoleType::Gatherer;
             }
         }
+        if (age >= 17) {
+            alive = false; // убираем муравья из муравейника
+            return; // досрочно выходим из метода
+        }
         else {
             updateRole();
         }
     }
 
     void updateRole() {
-        if (age < 2) {
-            role = nullptr; currentRoleType = RoleType::None;
-        }
-        else if (age < 4) {
+        if (age < 4) {
             role = make_shared<Nanny>(); currentRoleType = RoleType::Nanny;
         }
         else if (age > 12) {
@@ -157,16 +158,18 @@ public:
     int maxSize = MAX_ANTHILL_SIZE;
     int food = 50;
     int maxFood = MAX_STOREROOM;
-    int maxAnts = 20;
+    int maxAnts = 50;
 
     vector<shared_ptr<Formicidae>> ants;
     vector<Observer*> observers;
 
     void addAnt(shared_ptr<Formicidae> ant) {
-        if (ants.size() < maxAnts && size >= static_cast<int>(ants.size())) {
+        if (ants.size() < maxAnts && size >= static_cast<int>(ants.size()) + 1 && food >= 10) {
+            addFood(-10);
             ants.push_back(ant);
         }
     }
+
 
     void simulateDay() {
         for (auto& ant : ants) {
@@ -180,10 +183,17 @@ public:
             ants.end());
 
         // Обновление размера муравейника при достаточном уровне еды
-        if (food > maxFood * 0.5 && size < maxSize) {
+        /*if (food > maxFood * 0.5 && size < maxSize) {
             size += 1;
             maxAnts = size;
-        }
+        }*/
+
+        // Пример добавления нового муравья-няни в начале дня
+        auto newAnt = make_shared<Formicidae>();
+        newAnt->role = make_shared<Nanny>();
+        newAnt->currentRoleType = RoleType::Nanny;
+
+        addAnt(newAnt); // добавляем в муравейник с проверками
 
         // Регулировка еды
         if (food < maxFood) {
@@ -264,10 +274,10 @@ int main() {
     for (int day = 0; day < 20; ++day) {
         cout << "День " << (day) << "\n";
 
-        if (day == 9) {
+        /*if (day == 9) {
             Enemy enemy;
             enemy.attack(hill);
-        }
+        }*/
 
         hill.simulateDay();
 
