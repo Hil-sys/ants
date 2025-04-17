@@ -6,6 +6,7 @@
 #include <memory>
 #include <algorithm>
 #include <random>
+#include <cmath>
 
 using namespace std; // добавляем для устранения необходимости писать std::
 
@@ -259,6 +260,12 @@ public:
         }
 
         removeDeadAnts();
+
+        if (food < maxFood) {
+            food += rand() % 5;
+            if (food > maxFood) food = maxFood;
+        }
+
         /*ants.erase(remove_if(ants.begin(), ants.end(),
             [](const shared_ptr<Formicidae>& a) { return !a->alive; }),
             ants.end());*/
@@ -430,6 +437,8 @@ int main() {
         return -1;
     }
 
+    sf::Vector2f pasturePoint(200, -190);
+
     // Создаём графические объекты для отображения информации
     sf::RectangleShape infoBlock(sf::Vector2f(780, 180)); // Сделано выше, чем раньше
     infoBlock.setFillColor(sf::Color(50, 50, 50));
@@ -447,6 +456,8 @@ int main() {
     dayNumberText.setFillColor(sf::Color::White);
     dayNumberText.setPosition(10, 10);
 
+    sf::Color stickColor = sf::Color(128, 64, 0); // темный коричневый
+
     // Создаем экземпляр муравейника
     AntHill hill;
 
@@ -454,6 +465,25 @@ int main() {
 
     // Переменная для управления выходом из внутреннего цикла текущего дня
     bool dayFinished = false;
+
+    std::vector<sf::CircleShape> antShapes;
+    // Изначальные позиции муравьев
+    for (size_t i = 0; i < hill.ants.size(); ++i) {
+        sf::CircleShape shape(5);
+        shape.setFillColor(sf::Color::Red);
+        shape.setPosition(100, 200); // стартовые позиции
+        antShapes.push_back(shape);
+    }
+
+    // Пункты веточек (пример)
+    std::vector<sf::Vector2f> branchPoints = {
+        sf::Vector2f(170, 400),
+        sf::Vector2f(170, 400),
+        sf::Vector2f(170, 400),
+        sf::Vector2f(170, 400),
+        sf::Vector2f(170, 400)
+    };
+
     // Основной цикл по дням
     for (int day = 0; day < totalDays; ++day) {
         // Инициализация на первый день или симуляция следующего дня
@@ -487,6 +517,16 @@ int main() {
         }
 
 
+        if (antShapes.size() != hill.ants.size()) {
+            antShapes.clear();
+            for (size_t i = 0; i < hill.ants.size(); ++i) {
+                sf::CircleShape shape(5);
+                shape.setFillColor(sf::Color::Red);
+                shape.setPosition(100, 200);
+                antShapes.push_back(shape);
+            }
+        }
+
         // Управление текущим днём
         dayFinished = false;
         // Цикл, который продолжается, пока день активен
@@ -510,7 +550,7 @@ int main() {
             // Обновление текста информации
             std::stringstream ss;
             
-            ss << "Day: " << (day + 1) << "\n"
+            ss 
                 << "Hill size: " << hill.size << "\n"
                 << "Number of ants: " << hill.ants.size() << "\n"
                 << "Branches: " << hill.branches << "\n"
@@ -521,6 +561,11 @@ int main() {
                 << "Builders: " << countBuilder << "\n"
                 << "Shepherds: " << countShepherd;
 
+            if (hill.ants.size() == 0) {
+                cout << "Игра окончена, муравейник не выжил" << endl;
+                break;                
+            }
+
             infoText.setString(ss.str());
             dayNumberText.setString("Day: " + std::to_string(day + 1));
 
@@ -529,9 +574,68 @@ int main() {
             // Отрисовка статических элементов
             window.draw(anthillShape);
             window.draw(paddockShape);
-            for (const auto& stick : sticks) {
+            // Рисуем палочки чуть ниже муравейника
+            for (int i = 0; i < 5; ++i) {
+                sf::RectangleShape stick(sf::Vector2f(3, 20));
+                stick.setFillColor(sf::Color(128, 64, 0)); // коричневый
+                float xPos = 140 + i * 30; // горизонтальное смещение
+                float yPos = 400; // чуть ниже муравейника
+                stick.setPosition(xPos, yPos);
                 window.draw(stick);
             }
+
+            if (countBuilder > 0) {
+                // Анимация перемещения муравьев
+                for (size_t i = 0; i < antShapes.size(); ++i) {
+                    sf::Vector2f pos = antShapes[i].getPosition();
+
+                    sf::Vector2f target = branchPoints[i % branchPoints.size()];
+
+                    float speed = 0.05f;
+                    sf::Vector2f direction = target - pos;
+                    float distance = std::sqrt(direction.x * direction.x + direction.y * direction.y);
+                    if (distance > 1.0f) {
+                        sf::Vector2f step = direction * speed;
+                        antShapes[i].move(step);
+                    }
+                    // Нарисовать муравья
+                    window.draw(antShapes[i]);
+                }
+            }
+            else {
+                // Без анимации, просто отрисовать муравьев в стартовых позициях
+                for (size_t i = 0; i < antShapes.size(); ++i) {
+                    window.draw(antShapes[i]);
+                }
+            }
+
+            if (countShepherd > 0) {
+                for (size_t i = 0; i < antShapes.size(); ++i) {
+                    // Проверка роли муравья: если роль Shepherd
+                    if (hill.ants[i]->currentRoleType == RoleType::Shepherd) {
+                        sf::Vector2f pos = antShapes[i].getPosition(); // без &
+
+                        sf::Vector2f target = pasturePoint; // точка пашни
+
+                        float speed = 0.05f;
+                        sf::Vector2f direction = target - pos;
+                        float distance = std::sqrt(direction.x * direction.x + direction.y * direction.y);
+                        if (distance > 1.0f) {
+                            sf::Vector2f step = direction * speed;
+                            antShapes[i].move(step);
+                        }
+                    }
+                    // Нарисовать муравья
+                    window.draw(antShapes[i]);
+                }
+            }
+            else {
+                // Без анимации, отрисовать муравьев в стартовой позиции
+                for (size_t i = 0; i < antShapes.size(); ++i) {
+                    window.draw(antShapes[i]);
+                }
+            }
+
             // Отрисовка информационного блока
             window.draw(infoBlock);
             window.draw(infoText);
